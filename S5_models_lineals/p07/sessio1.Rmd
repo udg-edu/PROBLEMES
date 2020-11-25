@@ -1,0 +1,115 @@
+---
+title: "Problema 7"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source('lectura_taula.R')
+```
+
+**a. Representa gràficament la relació entre Elevation i Plant cover.**
+
+Per representar la relació entre dues variables numèriques podem utilitzar un gràfic de dispersió.
+
+```{r, fig.width=5.7, fig.height=5.2}
+with(taula, plot(elevacio, cobertura))
+```
+
+**b. Existeix relació entre les variables Elevació i Cobertura? Per què?**
+
+$H_0: \rho = 0$
+
+$H_1: \rho \neq 0$
+
+Farem el contrast de correlació `cor.test()`.
+
+```{r}
+with(taula, cor.test(elevacio, cobertura))
+```
+
+Després de rebutjar la hipòtesis nul·la, veiem evidències de què existeix correlació entre les dues variables.
+
+Una altra manera de veure que hi ha relació entre les dues variables, és construir un model que consideri aquesta relació lineal.
+
+```{r}
+model_1 = lm(cobertura~elevacio, data = taula)
+summary(model_1)
+```
+
+Amb el model de regressió lineal podem donar resposta a l'associació entre variables, i a més, la podem quantificar.
+
+
+Podem utilitzar el model lineal construït per visualitzar la relació
+
+```{r, fig.width=5.7, fig.height=5.2}
+with(taula, plot(elevacio, cobertura))
+abline(model_1, col = 'blue')
+```
+
+
+**c. Fes un model de regressió lineal simple que expliqui l’abundància a partir de la cobertura.**
+
+Per construir farem el mateix que a l'apartat anterior.
+
+```{r}
+model_2 = lm(abundancia~cobertura, data = taula)
+summary(model_2)
+```
+
+```{r}
+with(taula, plot(cobertura, abundancia))
+abline(model_2, col = 'blue')
+```
+
+* L'efecte de la cobertura a l'abundància és positiva, i per cada unitat de cobertura s'augmenta 2.5881 unitats d'abundància. 
+    * Aquest augment és significatiu, i per tant, tenim evidències de què el pendent de la recta és diferent de zero.
+* Coeficient de determinació. El model explica 0.5308 unitats de la variació de l'abundància. $R^2 = 0.5308$.
+    * En el cas de regressió lineal simple tenim:
+```{r}
+cor(taula$abundancia, taula$cobertura)^2
+```
+
+i en general (regressió lineal multivariant),
+
+```{r}
+SQT = var(taula$abundancia) * (9-1) # Suma de quadrats total.
+SQM = SQT - sum(model_2$residuals^2) # Suma de quadrats del nostre model.
+SQM/SQT
+```
+
+Comprovem ara les assumpcions del model.
+
+* Els residus siguin normals.
+
+Visualitzem els residus amb un histograma.
+
+```{r}
+hist( residuals(model_2) )
+```
+
+Fem un contrast per veure si podem assumir normalitat. Utilitzarem el test de Shapiro-Wilk
+
+```{r}
+shapiro.test( residuals(model_2) )
+```
+
+Podem continuar amb l'assumpció de normalitat.
+
+* Els residus siguin homoscedàstics
+
+Per veure els residus com són, utilitzarem els gràfics de diagnòstic.
+
+```{r}
+par(mfrow = c(2,2))
+plot(model_2)
+```
+
+Tot i que sembla que per prediccions mitjanes la variació dels residus sembla que sigui més elevada, anem a veure-ho amb un contrast d'homoscedasticitat:
+
+```{r}
+library(lmtest)
+bptest(model_2)
+```
+
+No tenim evidències per rebutjar l'homoscedasticitat.

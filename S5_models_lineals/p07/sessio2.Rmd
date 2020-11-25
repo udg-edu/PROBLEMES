@@ -1,0 +1,156 @@
+---
+title: "Problema 7"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Carreguem les dades
+
+```{r, warning=FALSE, message=FALSE}
+source("lectura_taula.R")
+```
+
+**a. Representa gràficament la relació entre Elevation i Plant cover.**
+
+Al ser dues variables numèriques, la seva relació la visualitzarem amb un gràfic de dispersió de punts.
+
+```{r, fig.width=5.2, fig.height=5}
+with(taula, plot(elevacio, cobertura))
+```
+
+La representació gràfica ens indica que a major elevació, major cobertura.
+
+**b. Existeix relació entre les variables Elevació i Cobertura? Per què?**
+
+Per veure si existeix relació entre les variables mirarem si existeix correlació entre elles. Ho farem amb el test de correlació lineal de Pearson (`cor.test()`).
+
+```{r}
+with(taula, cor.test(elevacio, cobertura))
+```
+
+La hipotesis:
+
+$H_0: \rho = 0$
+
+és rebutjada amb un valor p de 0.0006826. Donant evidència de què existeix correlació entre les dues variables.
+
+Una altra opció per veure si existeix relació entre dues variables és veient si podem ajustar un model lineal amb pendent diferent de zero.
+
+```{r}
+model_1 = lm(cobertura~elevacio, data=taula)
+summary(model_1)
+```
+
+Veiem que existeix relació perquè existeix una recta amb pendent significativament diferent de zero.
+
+```{r, fig.width=5.2, fig.height=5}
+with(taula, plot(elevacio, cobertura))
+abline(model_1, col = 'blue')
+```
+
+**c. Fes un model de regressió lineal simple que expliqui l’abundància a partir de la cobertura.**
+
+Comencem representant la relació entre aquestes dues variables:
+
+```{r}
+with(taula, plot(cobertura, abundancia))
+```
+
+
+Ajustem un model de regressió lineal per mínims quadrats amb la funció `lm()`.
+
+```{r}
+model_2 = lm(abundancia~cobertura, data=taula)
+summary(model_2)
+```
+
+* Veiem que el pendent de la recta és significativament diferent de zero (p-valor=0.026), per tant existeix una relació lineal entre a cobertura i l'abundància.
+* El coeficient de determinació ens indica que el 53.08% de la variació d'abundància ve explicada per la variació de la cobertura. $R^2=0.5308$.
+    * Per calcular l'$R^2$ podem elevar al quadrat la correlació.
+    
+```{r}
+with(taula, cor(cobertura, abundancia))^2
+```
+
+Una altra opció que evita calcular la correlació és mirar quin percentatge de variació està explicada pel model.
+
+```{r}
+SQT = var(taula$abundancia) * (9-1)
+SQE = sum(model_2$residuals^2)
+SQM = SQT - SQE
+SQM/SQT   # La proporció que hem estat capaços d'explicar.
+```
+
+Podem revisitar els valor amb el contrast ANOVA d'un model lineal.
+
+```{r}
+anova(model_2)
+```
+
+Per poder utilitzar un model lineal necessitem poder assumir dues hipòtesis.
+
+Per obtenir els residus podem utilitzar la funció `residuals()`.
+
+```{r}
+# model_2$residuals
+# model_2[['residuals']]
+residuals(model_2)
+```
+
+Per veure el que tenim posarem les observacions, prediccions i residus en una taula:
+
+```{r}
+tibble(
+  X = taula$cobertura,
+  Y = taula$abundancia,
+  Y_fit = model_2$fitted.values,
+  Residu = model_2$residuals
+)
+```
+
+* Normalitat dels residus.
+
+Veiem un histograma:
+
+```{r}
+hist(model_2$residuals)
+```
+
+Els gràfics bàsics de diagnòstic.
+
+```{r}
+par(mfrow = c(2,2))
+plot(model_2)
+```
+
+Mirant el gràfic de diagnòstic Q-Q, sembla que sí que hi hagi normalitat.
+
+
+Anem a veure el contrast de normalitat:
+
+* El test de Shapiro-Wilk
+```{r}
+shapiro.test(model_2$residuals)
+```
+
+Veiem que podem assumir normalitat.
+
+* Homoscedasticitat dels residus.
+
+
+Mirant el gràfic de residus vs. valors ajustats es veu un cert increment en la variació per valors predits al centre.
+
+Anem a veure el contrast d'homoscedasticitat:
+
+* El test de Breusch-Pagan:
+
+```{r, message=FALSE}
+library(lmtest)
+bptest(model_2)
+```
+
+Sembla que puguem assumir variàncies iguals.
+
