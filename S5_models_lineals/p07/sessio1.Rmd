@@ -113,3 +113,153 @@ bptest(model_2)
 ```
 
 No tenim evidències per rebutjar l'homoscedasticitat.
+
+**d. Fes un model de regressió lineal múltiple que expliqui l’abundància a partir de les altres
+variables numèriques.**
+
+Anem a descriure la variable Abundància.
+
+```{r}
+summary(taula$abundancia)
+```
+
+Sembla que la variable té un biaix a la dreta ja que mitjana > mediana.
+
+```{r}
+hist(taula$abundancia)
+```
+
+Comcencem amb el model més senzil que existeix.
+
+```{r}
+taula$abundancia
+```
+
+```{r}
+mean(taula$abundancia)
+```
+
+La mitjana és el valor que minimitza l'error quadràtic, o sigui, el model lineal que conté únicament un terme independent 
+
+```{r}
+m0 = lm(abundancia~1, data=taula)
+summary(m0)
+```
+
+serà el que té la mitjana.
+
+```{r}
+SQE0 = sum(residuals(m0)^2)
+SQT = SQE0
+```
+
+Anem a intentar ampliar el model `m0` amb altres variables numèriques.
+
+```{r}
+vnumeric = c('elevacio', 'cobertura', 'vertical', 'riquesa', 'diversitat')
+```
+
+Anem a crear la subtaula amb les variables numèriques.
+
+```{r}
+taula_num_1 = bind_cols(select(taula, abundancia),
+                        select(taula, all_of(vnumeric)))
+cor(taula_num_1)[1,]
+```
+
+```{r}
+taula_num_2 = bind_cols(residus = residuals(m0),
+                        select(taula, all_of(vnumeric)))
+cor(taula_num_2)[1,]
+```
+
+Veient les associacions, anem a afegir la variable `riquesa`.
+
+```{r}
+m1 = lm(abundancia~riquesa, data = taula)
+summary(m1)
+SQE1 = sum(residuals(m1)^2)
+```
+
+El nou model és significativament diferent que el model `m0`
+
+```{r}
+anova(m0, m1)
+```
+
+Volem continuar afegint noves variables. Quina podríem afegir?
+
+```{r}
+taula_num = bind_cols(residus = residuals(m1),
+                      select(taula, all_of(vnumeric)))
+round(cor(taula_num)[1,], 4)
+```
+
+Veiem que la diversitat és la variable que més s'associa als residus del model actual (la variació el que ens falta per explicar).
+
+```{r}
+# m2 = lm(abundancia~riquesa+diversitat, data = taula)
+m2 = update(m1, .~.+diversitat)
+summary(m2)
+```
+
+És el model `m2` significativament diferent del model `m1`? Podem veure que no tenim motius per veure que són diferents, perquè no tenim motius per dir que la beta associada a diversitat (en el model `m2`) sigui significativament diferent de zero.
+
+```{r}
+anova(m1, m2)
+```
+
+Utilitzant el contrast Anova acabaríem amb el model `m1` com a millor model que explica la variable abundancia.
+
+Mirem si es compleixen els supòsits del model `m1`.
+
+* Normalitat
+
+```{r}
+shapiro.test(residuals(m1))
+```
+
+* Homoscedasticitat
+
+```{r}
+lmtest::bptest(m1)
+```
+
+# Procés de selecció automàtica
+
+BIC i AIC són dos heurístics (mesures que avaluen un model) que no estan tant afectades per la mida mostral com el test Anova.
+
+A R tenim la funció `step()`.
+
+```{r}
+m_forward_aic = step(m0, scope = ~elevacio+cobertura+vertical+riquesa+diversitat,
+                     direction = 'forward')
+```
+
+Amb la cerca endavant i el criteri AIC, arribem al model explicat per les variables riquesa, diversitat i elevacio.
+
+```{r}
+summary(m_forward_aic)
+```
+
+```{r}
+m_both_aic = step(m0, scope = ~elevacio+cobertura+vertical+riquesa+diversitat,
+                     direction = 'both')
+```
+
+Anem a veure una cerca forwar-backward.
+
+```{r}
+m_both_aic_top = step(lm(abundancia~elevacio+cobertura+vertical+riquesa+diversitat, data=taula), 
+                      scope = ~elevacio+cobertura+vertical+riquesa+diversitat,
+                      direction = 'both')
+```
+
+Si vulguessim fer una cerca amb el criteri BIC aleshores hauríem d'afegir el paràmetres k = log(n).
+
+```{r}
+m_both_bic_top = step(lm(abundancia~elevacio+cobertura+vertical+riquesa+diversitat, data=taula), 
+                      scope = ~elevacio+cobertura+vertical+riquesa+diversitat,
+                      direction = 'both', k = log(9)) # nrow(taula) = 9
+```
+
