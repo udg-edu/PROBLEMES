@@ -154,3 +154,154 @@ bptest(model_2)
 
 Sembla que puguem assumir variàncies iguals.
 
+**d. Fes un model de regressió lineal múltiple que expliqui l’abundància a partir de les altres
+variables numèriques.**
+
+Fem una petita descriptiva de la variable abundància.
+
+```{r}
+summary(taula$abundancia)
+```
+
+També podem fer un histograma.
+
+```{r}
+hist(taula$abundancia)
+```
+
+Anem a construïr el modle més senzill possible.
+
+```{r}
+taula$abundancia
+```
+
+Si dieu la mitjana esteu minimitzant el vostre error quadràtic.
+
+```{r}
+sum( (taula$abundancia - 70)^2 )
+```
+
+qualsevol altre valor, tindria un error quadràtic superior:
+
+```{r}
+sum( (taula$abundancia - 69.5)^2 )
+```
+
+El model més senzil seria::
+
+```{r}
+m0 = lm(abundancia~1, data = taula)
+summary(m0)
+```
+
+Mirem quines variables numèriques tenim:
+
+```{r}
+dnumeric = select(taula, elevacio, cobertura, vertical, riquesa, diversitat)
+```
+
+Podríem seleccionar aquella variable que més s'associi a l'abundància.
+
+```{r}
+cor(bind_cols(select(taula, abundancia),
+              dnumeric))[1,]
+```
+
+això també ho hauríem pogut treure de seleccionar quina variable s'asssocia més als residus del model `m0`.
+
+```{r}
+cor(bind_cols(residuals(m0),
+              dnumeric))[1,]
+```
+
+La riquesa és la millor candidata a explicar el que no hem estat capaços d'explicar al model `m0`.
+
+```{r}
+# m1 = lm(abundancia~riquesa, data = taula)
+m1 = update(m0, .~.+riquesa)
+summary(m1)
+```
+
+Veiem que el model `m1` és capaç d'explicar un 92.02% de l'error que cometia el model `m0`.
+
+```{r}
+SQR_0 = SQT = sum(residuals(m0)^2)
+SQR_1 = sum(residuals(m1)^2)
+1-SQR_1 / SQT 
+```
+
+Com podríem afegir una nova variable?
+
+```{r}
+round(cor(bind_cols(residuals(m1),
+                    dnumeric))[1,], 4)
+```
+
+Una bona candidata a nova variable a afegir seria la variable diversitat, ja que és la que millor s'associa als residus del model `m1`.
+
+```{r}
+m2 = update(m1, .~.+diversitat)
+summary(m2)
+```
+
+veiem que no existeixen evidències per dir que el coeficient de diversitat sigui diferent de zero. No tenim evidències per dir que el model m1 i m2 siguin diferents.
+
+```{r}
+anova(m1,m2)
+```
+
+Per tant, com que no tenim evidències que isguin diferents ens quedem amb el model més simple: `m1`.
+
+* Normalitat
+
+```{r}
+shapiro.test(residuals(m1))
+```
+
+* Homoscedasticitat
+
+```{r}
+lmtest::bptest(m1)
+```
+
+> El procés de selecció anova té problemes amb la mida mostral.
+
+
+# Selecció de variables amb heurístics
+
+BIC i AIC són heurístics que eliminen l'efecte de la mida mostral per la selecció de variables.
+
+Podem fer una cerca loca del millor model utilitzant la funció `step()`.
+
+Anem a fer una cerca local, començant amb el model `m0`, i únicament permeten incloure noves variables. Utilitzarem l'heurístic AIC.
+
+```{r}
+m_forw_aic_bottom = step(m0, scope = ~elevacio+cobertura+vertical+riquesa+diversitat,
+                         direction = 'forward', k = 2)
+summary(m_forw_aic_bottom)
+```
+
+Anem a començar amb el model `m2`, permetem treure i posar variables. Utilitzarem l'heurístic AIC.
+
+```{r}
+m_both_aic_middle = step(m2, scope = ~elevacio+cobertura+vertical+riquesa+diversitat,
+                         direction = 'both', k = 2)
+summary(m_both_aic_middle)
+```
+
+Si vulguèssim fer una cerca amb l'heurístic BIC, hauríem de passar k = log(n) (k = log(nrow(taula))).
+
+
+```{r}
+m_both_bic_top = step(lm(abundancia~elevacio+cobertura+vertical+riquesa+diversitat, data=taula),
+                      scope = ~elevacio+cobertura+vertical+riquesa+diversitat,
+                      direction = 'both', k = log(9)) # nrow(taula) = 9
+summary(m_both_bic_top)
+```
+
+
+Podem utilitzar tant variable numèriques com categòriques
+
+```{r}
+step(lm(abundancia~., data=select(taula, -vegetacio, -lloc)), direction = 'both', k = log(9)) # nrow(taula) = 9
+```
